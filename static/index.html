@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Súper Dashboard: Gestor de Tareas & Asistente Personal IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .task-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .task-card:hover { transform: translateY(-3px); box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.08); }
+        .chat-container::-webkit-scrollbar { width: 6px; }
+        .chat-container::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+        .loader { border-top-color: #3b82f6; animation: spinner 1s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen font-sans overflow-hidden flex flex-col md:flex-row">
+
+    <main class="flex-1 h-full overflow-y-auto p-6 md:p-8 flex flex-col gap-6">
+        
+        <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-800 flex items-center gap-3">
+                    <i class="fa-solid fa-layer-group text-indigo-600"></i> Mi Agenda Inteligente
+                </h1>
+                <p class="text-slate-500 mt-1">Lleva el control de tus plazos y optimiza tu rendimiento diario</p>
+            </div>
+            <div class="flex bg-slate-200/80 p-1 rounded-lg self-start sm:self-center text-sm">
+                <button onclick="filtrarTareas('todas')" id="filter-todas" class="px-4 py-1.5 rounded-md font-medium text-slate-700 bg-white shadow-sm transition-all">Todas</button>
+                <button onclick="filtrarTareas('pendiente')" id="filter-pendiente" class="px-4 py-1.5 rounded-md font-medium text-slate-500 hover:text-slate-700 transition-all">Pendientes</button>
+                <button onclick="filtrarTareas('completado')" id="filter-completado" class="px-4 py-1.5 rounded-md font-medium text-slate-500 hover:text-slate-700 transition-all">Hechas</button>
+            </div>
+        </header>
+
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white border border-slate-200 p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                <div class="w-12 h-12 bg-amber-50 rounded-lg flex items-center justify-center text-amber-600 text-xl font-bold">
+                    <i class="fa-solid fa-fire-flame-curved animate-pulse"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase">Racha de Progreso</p>
+                    <h3 class="text-xl font-extrabold text-slate-800" id="statStreak">5 Días</h3>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                <div class="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 text-xl font-bold">
+                    <span id="statPendingCount">0</span>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase">Por Hacer</p>
+                    <h3 class="text-sm font-medium text-slate-600">Tareas en espera</h3>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                <div class="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 text-xl font-bold">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase">Completadas</p>
+                    <h3 class="text-xl font-extrabold text-slate-800" id="statCompletedCount">0</h3>
+                </div>
+            </div>
+        </section>
+
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+            <form id="taskForm" onsubmit="crearTarea(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-2 flex flex-col gap-1">
+                    <label class="text-xs font-bold text-slate-500 uppercase">¿Qué tienes planeado?</label>
+                    <input type="text" id="taskTitle" required placeholder="Ej. Redactar marco teórico del proyecto" 
+                           class="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs font-bold text-slate-500 uppercase">Fecha Límite</label>
+                    <input type="date" id="taskDate" 
+                           class="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-600 transition-all">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 text-sm h-[38px]">
+                        <i class="fa-solid fa-plus"></i> Añadir a mi Agenda
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="taskList" class="grid grid-cols-1 xl:grid-cols-2 gap-4 flex-1 pb-4">
+            </div>
+    </main>
+
+    <aside class="w-full md:w-[400px] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-[50vh] md:h-full z-10">
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 shadow-md flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl shadow-inner animate-pulse">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                    <h2 class="font-extrabold text-sm tracking-wide">Asistente Personal IA</h2>
+                    <p class="text-xs text-indigo-200 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span> Analizando tu agenda
+                    </p>
+                </div>
+            </div>
+            <button onclick="solicitarResumenInicial()" class="text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-md border border-white/20 transition-all" title="Pedir estatus del día">
+                <i class="fa-solid fa-bell"></i> Estado
+            </button>
+        </div>
+
+        <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-4 chat-container bg-slate-50/60">
+            </div>
+
+        <div class="p-4 bg-white border-t border-slate-200">
+            <form onsubmit="enviarMensaje(event)" class="flex gap-2">
+                <input type="text" id="chatInput" placeholder="Pregúntame: ¿Cómo va mi día? o ¿Qué hago primero?" autocomplete="off"
+                       class="flex-1 px-4 py-2.5 rounded-full border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">
+                <button type="submit" class="w-10 h-10 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 flex items-center justify-center transition-colors shadow-md">
+                    <i class="fa-solid fa-paper-plane text-sm"></i>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8000';
+        let todasLasTareas = [];
+        let filtroActual = 'todas';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            obtenerTareas();
+            // Ejecutar la notificación automática de bienvenida e informe de agenda al cargar
+            setTimeout(solicitarResumenInicial, 800);
+        });
+
+        // --- ACCIONES CRUD ---
+        async function obtenerTareas() {
+            try {
+                const res = await fetch(`${API_URL}/tasks`);
+                todasLasTareas = await res.json();
+                actualizarMetricas(todasLasTareas);
+                renderTasks(todasLasTareas);
+            } catch (e) { console.error("Error obteniendo tareas:", e); }
+        }
+
+        async function crearTarea(e) {
+            e.preventDefault();
+            const title = document.getElementById('taskTitle').value;
+            const dateVal = document.getElementById('taskDate').value;
+            
+            const newTask = {
+                title,
+                description: "Ingresada desde el Súper Dashboard",
+                status: "pendiente",
+                priority: "media",
+                due_date: dateVal ? dateVal : null
+            };
+
+            await fetch(`${API_URL}/tasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newTask)
+            });
+            
+            document.getElementById('taskForm').reset();
+            await obtenerTareas();
+            
+            // Notificar al chat lateral que agregamos algo para que opine
+            appendMessage('user', `Acabo de añadir la tarea: "${title}"`);
+            const typingId = appendMessage('ai', '<i class="fa-solid fa-ellipsis fa-fade"></i>');
+            procesarRespuestaIA(`El usuario añadió la tarea "${title}". Confírmale que la guardaste en agenda y dale un tip corto de organización.`, typingId);
+        }
+
+        async function eliminarTarea(id) {
+            if(!confirm("¿Eliminar de forma permanente de Supabase?")) return;
+            await fetch(`${API_URL}/tasks/${id}`, { method: 'DELETE' });
+            obtenerTareas();
+        }
+
+        async function toggleEstado(id, title, description, currentStatus, priority, dueDate) {
+            const newStatus = currentStatus === 'completado' ? 'pendiente' : 'completado';
+            await fetch(`${API_URL}/tasks/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, status: newStatus, priority, due_date: dueDate })
+            });
+            await obtenerTareas();
+
+            if (newStatus === 'completado') {
+                appendMessage('user', `¡He completado la tarea: "${title}"!`);
+                const typingId = appendMessage('ai', '<i class="fa-solid fa-ellipsis fa-fade"></i>');
+                procesarRespuestaIA(`El usuario completó la tarea "${title}". Felicítalo de forma muy motivadora y entusiasta.`, typingId);
+            }
+        }
+
+        async function analizarIA(id, title, description, status, dueDate) {
+            const btn = document.getElementById(`btn-ai-${id}`);
+            btn.innerHTML = '<div class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full loader"></div>';
+            
+            const resIA = await fetch(`${API_URL}/tasks/analyze?task_content=${encodeURIComponent(title)}`, { method: 'POST' });
+            const dataIA = await resIA.json();
+            
+            await fetch(`${API_URL}/tasks/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, status, priority: dataIA.priority, due_date: dueDate })
+            });
+            obtenerTareas();
+        }
+
+        // --- SISTEMA DE FILTROS Y RENDERS ---
+        function filtrarTareas(tipo) {
+            filtroActual = tipo;
+            ['todas', 'pendiente', 'completado'].forEach(f => {
+                const btn = document.getElementById(`filter-${f}`);
+                if(f === tipo) {
+                    btn.className = "px-4 py-1.5 rounded-md font-medium text-slate-700 bg-white shadow-sm transition-all";
+                } else {
+                    btn.className = "px-4 py-1.5 rounded-md font-medium text-slate-500 hover:text-slate-700 transition-all";
+                }
+            });
+            renderTasks(todasLasTareas);
+        }
+
+        function actualizarMetricas(tasks) {
+            const pendientes = tasks.filter(t => t.status === 'pendiente').length;
+            const completadas = tasks.filter(t => t.status === 'completado').length;
+            
+            document.getElementById('statPendingCount').innerText = pendientes;
+            document.getElementById('statCompletedCount').innerText = completadas;
+            
+            // Simulación lógica de racha basada en completadas
+            const streak = completadas > 0 ? Math.min(completadas + 2, 7) : 1;
+            document.getElementById('statStreak').innerText = `${streak} Días 🔥`;
+        }
+
+        function renderTasks(tasks) {
+            const container = document.getElementById('taskList');
+            container.innerHTML = '';
+            
+            let filtradas = tasks;
+            if(filtroActual !== 'todas') {
+                filtradas = tasks.filter(t => t.status === filtroActual);
+            }
+
+            if(filtradas.length === 0) {
+                container.innerHTML = `<div class="col-span-1 xl:col-span-2 text-center text-slate-400 py-12">No hay tareas que coincidan con el filtro.</div>`;
+                return;
+            }
+
+            filtradas.sort((a, b) => a.status === 'completado' ? 1 : -1);
+
+            filtradas.forEach(task => {
+                const isCompleted = task.status === 'completado';
+                let prioColor = "bg-slate-100 text-slate-600";
+                if(task.priority === 'alta') prioColor = "bg-rose-100 text-rose-700 border border-rose-200";
+                if(task.priority === 'media') prioColor = "bg-amber-100 text-amber-700 border border-amber-200";
+                if(task.priority === 'baja') prioColor = "bg-emerald-100 text-emerald-700 border border-emerald-200";
+
+                const dateDisplay = task.due_date ? 
+                    `<span class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md flex items-center gap-1.5"><i class="fa-regular fa-calendar-days text-indigo-500"></i> Plazo: ${task.due_date}</span>` 
+                    : `<span class="text-xs font-medium text-slate-400 bg-slate-50 px-2 py-1 rounded-md flex items-center gap-1.5"><i class="fa-regular fa-calendar text-slate-300"></i> Sin plazo establecido</span>`;
+
+                container.innerHTML += `
+                    <div class="task-card bg-white p-5 rounded-xl border border-slate-200 flex flex-col justify-between shadow-sm ${isCompleted ? 'opacity-55 bg-slate-50/50' : ''}">
+                        <div>
+                            <div class="flex justify-between items-start gap-4 mb-2">
+                                <h3 class="font-bold text-base ${isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}">${task.title}</h3>
+                                <span class="text-[10px] font-extrabold px-2.5 py-1 rounded uppercase tracking-wider flex-shrink-0 ${prioColor}">${task.priority}</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-3 mb-1">${dateDisplay}</div>
+                        </div>
+                        <div class="flex justify-between items-center pt-4 mt-4 border-t border-slate-100">
+                            <button onclick="toggleEstado(${task.id}, '${task.title}', '${task.description}', '${task.status}', '${task.priority}', ${task.due_date ? `'${task.due_date}'` : null})" 
+                                    class="text-sm font-semibold transition-colors flex items-center gap-1.5 ${isCompleted ? 'text-slate-500 hover:text-slate-700' : 'text-emerald-600 hover:text-emerald-700'}">
+                                <i class="fa-solid ${isCompleted ? 'fa-rotate-left' : 'fa-circle-check'}"></i> ${isCompleted ? 'Reabrir' : 'Marcar Hecha'}
+                            </button>
+                            <div class="flex gap-2">
+                                <button id="btn-ai-${task.id}" onclick="analizarIA(${task.id}, '${task.title}', '${task.description}', '${task.status}', ${task.due_date ? `'${task.due_date}'` : null})" 
+                                        class="w-8 h-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center hover:bg-purple-100 border border-purple-100 transition-all" title="Recalcular prioridad con IA">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                                </button>
+                                <button onclick="eliminarTarea(${task.id})" class="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 border border-rose-100 transition-all" title="Eliminar del sistema">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // --- PANEL CONVERSACIONAL (CHAT ASISTENTE) ---
+        async function solicitarResumenInicial() {
+            const typingId = appendMessage('ai', '<i class="fa-solid fa-ellipsis fa-fade"></i>');
+            procesarRespuestaIA("Saluda al usuario. Haz una revisión proactiva de su lista de tareas y dile si tiene cosas pendientes urgentes o si su agenda está libre hoy. Sé muy breve y dinámico.", typingId);
+        }
+
+        async function enviarMensaje(e) {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if(!msg) return;
+
+            appendMessage('user', msg);
+            input.value = '';
+
+            const typingId = appendMessage('ai', '<i class="fa-solid fa-ellipsis fa-fade"></i>');
+            procesarRespuestaIA(msg, typingId);
+        }
+
+        async function procesarRespuestaIA(userPrompt, htmlElementId) {
+            try {
+                const res = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userPrompt })
+                });
+                const data = await res.json();
+                
+                // Formatear saltos de línea para que se rendericen en HTML
+                document.getElementById(htmlElementId).innerHTML = data.response.replace(/\n/g, '<br>');
+            } catch (e) {
+                document.getElementById(htmlElementId).innerText = "No logré conectar con el servidor.";
+            }
+            scrollToBottom();
+        }
+
+        function appendMessage(sender, text) {
+            const chatBox = document.getElementById('chatBox');
+            const id = 'msg-' + Date.now();
+            
+            if(sender === 'user') {
+                chatBox.innerHTML += `
+                    <div class="flex justify-end gap-3 mb-2">
+                        <div class="bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none shadow-sm text-sm max-w-[85%] font-medium">
+                            ${text}
+                        </div>
+                    </div>`;
+            } else {
+                chatBox.innerHTML += `
+                    <div class="flex gap-3 mb-2">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center flex-shrink-0 text-xs shadow">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div id="${id}" class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-slate-700 border border-slate-200/60 max-w-[85%] leading-relaxed">
+                            ${text}
+                        </div>
+                    </div>`;
+            }
+            scrollToBottom();
+            return id;
+        }
+
+        function scrollToBottom() {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
